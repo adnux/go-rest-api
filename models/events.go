@@ -1,29 +1,71 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/adnux/go-rest-api/db"
+)
 
 type Event struct {
-	ID          int       `json:"id"`
+	ID          int64     `json:"id"`
 	Name        string    `json:"name" binding:"required"`
 	Description string    `json:"description" binding:"required"`
 	Location    string    `json:"location" binding:"required"`
 	DateTime    time.Time `json:"datetime" binding:"required"`
-	UserId      int       `json:"user_id"`
+	UserId      int64     `json:"user_id"`
 }
 
-var events = []Event{}
+func (event Event) Save() (Event, error) {
+	query := `
+	INSERT INTO events(name, description, location, dateTime, user_id) 
+	VALUES (?, ?, ?, ?, ?)`
 
-func (event Event) Save() ([]Event, error) {
+	stmt, err := db.DB.Prepare(query)
+	if err != nil {
+		return Event{}, err
+	}
+	defer stmt.Close()
 
-	event.ID = len(events) + 1
+	result, err := stmt.Exec(
+		event.Name,
+		event.Description,
+		event.Location,
+		event.DateTime,
+		event.UserId,
+	)
+	if err != nil {
+		return Event{}, err
+	}
+
+	event.ID, err = result.LastInsertId()
 	event.UserId = 1
 
-	// add to database
-	events = append(events, event)
-	return events, nil
+	return event, err
 }
 
 func GetAllEvents() ([]Event, error) {
-	// get from database
+	query := "SELECT * FROM events"
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []Event
+	for rows.Next() {
+		var event Event
+		if err := rows.Scan(
+			&event.ID,
+			&event.Name,
+			&event.Description,
+			&event.Location,
+			&event.DateTime,
+			&event.UserId,
+		); err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+
 	return events, nil
 }
