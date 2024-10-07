@@ -148,3 +148,32 @@ func deleteEvent(context *gin.Context) {
 		"message": "Event deleted!",
 	})
 }
+
+func signUp(context *gin.Context) {
+	var user models.User
+	err := context.ShouldBindJSON(&user)
+
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{
+			"error":   err.Error(),
+			"message": "Could not bind user data.",
+		})
+		return
+	}
+
+	user, err = user.Save()
+
+	if err != nil {
+		context.JSON(
+			http.StatusInternalServerError, gin.H{
+				"error":   err.Error(),
+				"message": "Could not create user.",
+			})
+		return
+	}
+
+	context.JSON(http.StatusCreated, gin.H{
+		"message": "User created!",
+		"user":    user,
+	})
+}
