@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/adnux/go-rest-api/db"
@@ -114,7 +115,9 @@ func (event Event) UpdateEvent() error {
 }
 
 func (event Event) DeleteEvent() error {
-	query := "DELETE FROM events WHERE id = ?"
+	query := `
+	DELETE FROM events WHERE id = ?
+	`
 	stmt, err := db.DB.Prepare(query)
 	if err != nil {
 		return err
@@ -122,5 +125,42 @@ func (event Event) DeleteEvent() error {
 	defer stmt.Close()
 
 	_, err = stmt.Exec(event.ID)
+	return err
+}
+
+func (event Event) Register(userId int64) error {
+	query := `
+	INSERT INTO registrations(event_id, user_id) VALUES (?, ?)
+	`
+	stmt, err := db.DB.Prepare(query)
+
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(event.ID, userId)
+
+	return err
+}
+
+func (event Event) CancelRegistration(userId int64) error {
+	query := `
+	UPDATE registrations
+	SET active = 0
+	WHERE event_id = ? AND user_id = ? AND active = true
+	`
+
+	result, err := db.DB.Exec(query, event.ID, userId)
+	if err != nil {
+		return err
+	}
+
+	total, err := result.RowsAffected()
+	if total == 0 {
+		return errors.New("no active registration found")
+	}
+
 	return err
 }

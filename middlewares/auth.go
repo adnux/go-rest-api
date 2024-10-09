@@ -17,7 +17,7 @@ func Authenticate(context *gin.Context) {
 		return
 	}
 
-	userId, err := utils.VerifyToken(token)
+	authUserId, err := utils.VerifyToken(token)
 
 	if err != nil {
 		context.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
@@ -26,6 +26,6 @@ func Authenticate(context *gin.Context) {
 		return
 	}
 
-	context.Set("userId", userId)
+	context.Set("authUserId", authUserId)
 	context.Next()
 }
