@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -72,4 +73,31 @@ func cancelRegistration(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{
 		"message": "Registration cancelled!",
 	})
+}
+
+func getAllRegistrationsFromEvent(context *gin.Context) {
+	authUserId := context.GetInt64("authUserId")
+	eventId, err := strconv.ParseInt(context.Param("id"), 10, 64)
+
+	fmt.Println("getAllRegistrationsFromEvent", authUserId, eventId)
+
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{
+			"error":   err.Error(),
+			"message": "Could not parse event id.",
+		})
+		return
+	}
+
+	registrations, err := models.GetRegistrationsForEvent(eventId, authUserId)
+
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"error":   err.Error(),
+			"message": "Could not fetch registrations.",
+		})
+		return
+	}
+
+	context.JSON(http.StatusOK, registrations)
 }
