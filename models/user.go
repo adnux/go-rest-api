@@ -11,8 +11,8 @@ type User struct {
 	ID        int64  `json:"id"`
 	Email     string `json:"email" binding:"required"`
 	Password  string `json:"password" binding:"required"`
-	FirstName string `json:"firstname" binding:"required"`
-	LastName  string `json:"lastname" binding:"required"`
+	FirstName string `json:"firstname"`
+	LastName  string `json:"lastname"`
 }
 
 func (user *User) Save() error {
