@@ -4,83 +4,28 @@ import (
 	"database/sql"
 
 	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-var DB *sql.DB
+var SQLDB *sql.DB
+var DB *gorm.DB
 
 func InitDB() {
 	var err error
-	DB, err = sql.Open("sqlite3", "api.db")
+	SQLDB, err := sql.Open("sqlite3", "api-gorm.db")
+	SQLDB.SetMaxOpenConns(15)
+	SQLDB.SetMaxIdleConns(3)
+	if err != nil {
+		panic("Could not connect to database.")
+	}
+
+	DB, err = gorm.Open(sqlite.New(sqlite.Config{
+		Conn: SQLDB,
+	}), &gorm.Config{})
 
 	if err != nil {
 		panic("Could not connect to database.")
 	}
 
-	DB.SetMaxOpenConns(15)
-	DB.SetMaxIdleConns(3)
-
-	createTables()
-}
-
-func createTables() {
-	createUsersTable()
-	createEventsTable()
-	createRegistrationsTable()
-}
-
-func createUsersTable() {
-	createUsersTable := `
-	CREATE TABLE IF NOT EXISTS users (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		email TEXT NOT NULL,
-		password TEXT NOT NULL,
-		firstname TEXT NOT NULL,
-		lastname TEXT NOT NULL
-	)
-	`
-
-	_, err := DB.Exec(createUsersTable)
-
-	if err != nil {
-		panic("Could not create users table.")
-	}
-}
-
-func createEventsTable() {
-	createEventsTable := `
-	CREATE TABLE IF NOT EXISTS events (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		description TEXT NOT NULL,
-		location TEXT NOT NULL,
-		dateTime DATETIME NOT NULL,
-		user_id INTEGER,
-		FOREIGN KEY(user_id) REFERENCES users(id)
-	)
-	`
-
-	_, err := DB.Exec(createEventsTable)
-
-	if err != nil {
-		panic("Could not create events table.")
-	}
-}
-
-func createRegistrationsTable() {
-	createRegistrationsTable := `
-	CREATE TABLE IF NOT EXISTS registrations (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		event_id INTEGER,
-		user_id INTEGER,
-		active BOOLEAN DEFAULT TRUE,
-		FOREIGN KEY(event_id) REFERENCES events(id),
-		FOREIGN KEY(user_id) REFERENCES users(id)
-	)
-	`
-
-	_, err := DB.Exec(createRegistrationsTable)
-
-	if err != nil {
-		panic("Could not create registrations table.")
-	}
 }
