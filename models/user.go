@@ -8,25 +8,28 @@ import (
 )
 
 type User struct {
-	ID        int64  `json:"id"`
+	ID        int64  `json:"id" gorm:"primarykey"`
 	Email     string `json:"email" binding:"required"`
-	Password  string `json:"password" binding:"required"`
-	FirstName string `json:"firstname"`
-	LastName  string `json:"lastname"`
+	Password  string `json:"password,omitempty" binding:"required"`
+	FirstName string `json:"first_name" gorm:"column:first_name"`
+	LastName  string `json:"last_name" gorm:"column:last_name"`
+}
+
+func GetUserByID(id int64) (*User, error) {
+	var user User
+	result := db.DB.
+		Model(&User{}).
+		Where("id = ?", id).
+		First(&user)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &user, nil
 }
 
 func (user *User) Save() error {
-	query := `
-	INSERT INTO users(email, password, firstname, lastname) VALUES (?, ?, ?, ?)
-	`
-	stmt, err := db.DB.Prepare(query)
-
-	if err != nil {
-		return err
-	}
-
-	defer stmt.Close()
-
 	hashedPassword, err := utils.HashPassword(user.Password)
 	user.Password = hashedPassword
 
@@ -34,56 +37,58 @@ func (user *User) Save() error {
 		return err
 	}
 
-	result, err := stmt.Exec(
-		user.Email,
-		user.Password,
-		user.FirstName,
-		user.LastName,
-	)
+	result := db.DB.
+		Model(&User{}).
+		Create(&user)
 
-	if err != nil {
-		return err
+	if result.Error != nil {
+		return result.Error
 	}
 
-	userId, err := result.LastInsertId()
-
-	user.ID = userId
-	return err
+	return nil
 }
 
 func (user User) DeleteUser() error {
-	query := `
-	DELETE FROM users WHERE id = ?
-	`
-	stmt, err := db.DB.Prepare(query)
+	result := db.DB.
+		Model(&User{}).
+		Delete(&user)
 
-	if err != nil {
-		return err
+	if result.Error != nil {
+		return result.Error
 	}
 
-	defer stmt.Close()
-
-	_, err = stmt.Exec(user.ID)
-
-	return err
+	return nil
 }
 
-func (u *User) ValidateCredentials() error {
-	query := "SELECT id, password FROM users WHERE email = ?"
-	row := db.DB.QueryRow(query, u.Email)
+func (user *User) ValidateCredentials() error {
+	plainPassword := user.Password
+	result := db.DB.
+		Model(&User{}).
+		Where("email = ?", user.Email).
+		First(&user)
 
-	var retrievedPassword string
-	err := row.Scan(&u.ID, &retrievedPassword)
-
-	if err != nil {
+	if result.Error != nil {
 		return errors.New("credentials invalid")
 	}
 
-	passwordIsValid := utils.CheckPasswordHash(u.Password, retrievedPassword)
+	passwordIsValid := utils.CheckPasswordHash(plainPassword, user.Password)
 
 	if !passwordIsValid {
 		return errors.New("credentials invalid")
 	}
 
 	return nil
+}
+
+func GetAllUsers() ([]User, error) {
+	var users []User
+	result := db.DB.
+		Model(User{}).
+		Find(&users)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return users, nil
 }

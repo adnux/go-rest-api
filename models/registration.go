@@ -1,41 +1,30 @@
 package models
 
-import "github.com/adnux/go-rest-api/db"
+import (
+	"github.com/adnux/go-rest-api/db"
+	"gorm.io/gorm"
+)
 
 type Registration struct {
-	ID      int64 `json:"id"`
+	ID      int64 `json:"id" gorm:"primarykey"`
 	EventId int64 `json:"event_id" binding:"required"`
-	UserId  int64 `json:"user_id" binding:"required"`
 	Active  bool  `json:"active"`
+	UserID  int64 `json:"user_id" binding:"required"`
+	User    User  `json:"user" gorm:"foreignKey:UserID;references:ID"`
 }
 
 func GetRegistrationsForEvent(eventId int64, userId int64) ([]Registration, error) {
-	query := `
-	SELECT reg.id, reg.event_id, reg.user_id, reg.active
-	  FROM registrations reg
-	  LEFT JOIN events ev
-		  ON reg.event_id = ev.id
-	 WHERE event_id = ?
-	   AND ev.user_id = ?
-	`
-	rows, err := db.DB.Query(query, eventId, userId)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	var registrations []Registration
-	for rows.Next() {
-		var registration Registration
-		if err := rows.Scan(
-			&registration.ID,
-			&registration.EventId,
-			&registration.UserId,
-			&registration.Active,
-		); err != nil {
-			return nil, err
-		}
-		registrations = append(registrations, registration)
+	result := db.DB.
+		Model(&Registration{}).
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, email, first_name, last_name")
+		}).
+		Where("event_id = ? AND user_id = ?", eventId, userId).
+		Find(&registrations)
+
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
 	return registrations, nil
