@@ -1,12 +1,15 @@
 package main
 
 import (
+	_ "embed"
+
 	"github.com/adnux/go-rest-api/db"
 	"github.com/adnux/go-rest-api/routes"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+
 	db.InitDB()
 	server := gin.Default()
 

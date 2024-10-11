@@ -1,7 +1,9 @@
 package models
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/adnux/go-rest-api/db"
 	"github.com/adnux/go-rest-api/utils"
@@ -15,40 +17,40 @@ type User struct {
 	LastName  string `json:"lastname"`
 }
 
-func (user *User) Save() error {
-	query := `
-	INSERT INTO users(email, password, firstname, lastname) VALUES (?, ?, ?, ?)
-	`
-	stmt, err := db.DB.Prepare(query)
-
-	if err != nil {
-		return err
-	}
-
-	defer stmt.Close()
-
+func (user User) Save() (User, error) {
+	fmt.Println("User.Save() called", user)
 	hashedPassword, err := utils.HashPassword(user.Password)
-	user.Password = hashedPassword
+	fmt.Println("hashedPassword", hashedPassword)
 
 	if err != nil {
-		return err
+		return User{}, err
 	}
 
-	result, err := stmt.Exec(
-		user.Email,
-		user.Password,
-		user.FirstName,
-		user.LastName,
-	)
-
-	if err != nil {
-		return err
+	// Check if db.DBQueries is nil
+	if db.DBQueries == nil {
+		return User{}, errors.New("db.DBQueries is nil")
 	}
+	fmt.Println("DBQueries", db.DBQueries)
 
-	userId, err := result.LastInsertId()
+	// Check if db.CTX is nil
+	if db.CTX == nil {
+		return User{}, errors.New("db.CTX is nil")
+	}
+	fmt.Println("DB.CTX", db.CTX)
 
-	user.ID = userId
-	return err
+	insertedUser, err := db.DBQueries.InsertUser(db.CTX, db.InsertUserParams{
+		Email:     user.Email,
+		Password:  hashedPassword,
+		FirstName: sql.NullString{String: user.FirstName, Valid: user.FirstName != ""},
+		LastName:  sql.NullString{String: user.LastName, Valid: user.LastName != ""},
+	})
+
+	user.ID = insertedUser.ID
+	user.Email = insertedUser.Email
+	user.Password = insertedUser.Password
+	user.FirstName = insertedUser.FirstName.String
+	user.LastName = insertedUser.LastName.String
+	return user, err
 }
 
 func (user User) DeleteUser() error {
@@ -68,18 +70,15 @@ func (user User) DeleteUser() error {
 	return err
 }
 
-func (u *User) ValidateCredentials() error {
-	query := "SELECT id, password FROM users WHERE email = ?"
-	row := db.DB.QueryRow(query, u.Email)
-
-	var retrievedPassword string
-	err := row.Scan(&u.ID, &retrievedPassword)
+func (user *User) ValidateCredentials() error {
+	userFound, err := db.DBQueries.GetUserByEmail(db.CTX, user.Email)
 
 	if err != nil {
 		return errors.New("credentials invalid")
 	}
+	retrievedPassword := userFound.Password
 
-	passwordIsValid := utils.CheckPasswordHash(u.Password, retrievedPassword)
+	passwordIsValid := utils.CheckPasswordHash(user.Password, retrievedPassword)
 
 	if !passwordIsValid {
 		return errors.New("credentials invalid")

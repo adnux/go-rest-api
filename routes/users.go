@@ -22,7 +22,7 @@ func signUp(context *gin.Context) {
 		return
 	}
 
-	err = user.Save()
+	user, err = user.Save()
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -50,7 +50,6 @@ func login(context *gin.Context) {
 		})
 		return
 	}
-
 	err = user.ValidateCredentials()
 
 	if err != nil {
