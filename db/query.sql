@@ -16,26 +16,26 @@ WHERE id = ?
 ;
 
 -- name: GetEvents :many
-SELECT id, name, description, location, dateTime, user_id
+SELECT id, name, description, location, date_time, user_id
 FROM events
 ;
 
 -- name: GetEvent :one
-SELECT id, name, description, location, dateTime, user_id
+SELECT id, name, description, location, date_time, user_id
 FROM events
 WHERE id = ?
 ;
 
 -- name: InsertEvent :one
-INSERT INTO events (name, description, dateTime, location, user_id)
+INSERT INTO events (name, description, date_time, location, user_id)
 VALUES (?, ?, ?, ?, ?)
-RETURNING id, name, description, location, dateTime, user_id
+RETURNING id, name, description, location, date_time, user_id
 
 ;
 
 -- name: UpdateEvent :exec
 UPDATE events
-SET name = ?, description = ?, location = ?, dateTime = ?, user_id = ?
+SET name = ?, description = ?, location = ?, date_time = ?, user_id = ?
 WHERE id = ?
 ;
 
@@ -58,8 +58,10 @@ RETURNING id, event_id, user_id, active
 ;
 
 -- name: GetRegistrations :many
-SELECT reg.id, reg.event_id, reg.user_id, reg.active
+SELECT sqlc.embed(reg), sqlc.embed(ev), u.id, u.email, u.first_name, u.last_name
 	FROM registrations reg
+	LEFT JOIN users u
+		ON u.id = reg.user_id
 	LEFT JOIN events ev
 		ON reg.event_id = ev.id
 	WHERE event_id = ?

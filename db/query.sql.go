@@ -7,8 +7,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"time"
 )
 
@@ -22,8 +20,8 @@ RETURNING id, event_id, user_id, active
 `
 
 type CancelRegistrationParams struct {
-	EventID int64
-	UserID  int64
+	EventID int64 `json:"event_id"`
+	UserID  int64 `json:"user_id"`
 }
 
 func (q *Queries) CancelRegistration(ctx context.Context, arg CancelRegistrationParams) (Registration, error) {
@@ -65,7 +63,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 const getEvent = `-- name: GetEvent :one
 ;
 
-SELECT id, name, description, location, dateTime, user_id
+SELECT id, name, description, location, date_time, user_id
 FROM events
 WHERE id = ?
 `
@@ -78,7 +76,7 @@ func (q *Queries) GetEvent(ctx context.Context, id int64) (Event, error) {
 		&i.Name,
 		&i.Description,
 		&i.Location,
-		&i.Datetime,
+		&i.DateTime,
 		&i.UserID,
 	)
 	return i, err
@@ -87,7 +85,7 @@ func (q *Queries) GetEvent(ctx context.Context, id int64) (Event, error) {
 const getEvents = `-- name: GetEvents :many
 ;
 
-SELECT id, name, description, location, dateTime, user_id
+SELECT id, name, description, location, date_time, user_id
 FROM events
 `
 
@@ -105,7 +103,7 @@ func (q *Queries) GetEvents(ctx context.Context) ([]Event, error) {
 			&i.Name,
 			&i.Description,
 			&i.Location,
-			&i.Datetime,
+			&i.DateTime,
 			&i.UserID,
 		); err != nil {
 			return nil, err
@@ -124,8 +122,10 @@ func (q *Queries) GetEvents(ctx context.Context) ([]Event, error) {
 const getRegistrations = `-- name: GetRegistrations :many
 ;
 
-SELECT reg.id, reg.event_id, reg.user_id, reg.active
+SELECT reg.id, reg.event_id, reg.user_id, reg.active, ev.id, ev.name, ev.description, ev.location, ev.date_time, ev.user_id, u.id, u.email, u.first_name, u.last_name
 	FROM registrations reg
+	LEFT JOIN users u
+		ON u.id = reg.user_id
 	LEFT JOIN events ev
 		ON reg.event_id = ev.id
 	WHERE event_id = ?
@@ -133,24 +133,43 @@ SELECT reg.id, reg.event_id, reg.user_id, reg.active
 `
 
 type GetRegistrationsParams struct {
-	EventID int64
-	UserID  int64
+	EventID int64 `json:"event_id"`
+	UserID  int64 `json:"user_id"`
 }
 
-func (q *Queries) GetRegistrations(ctx context.Context, arg GetRegistrationsParams) ([]Registration, error) {
+type GetRegistrationsRow struct {
+	Registration Registration `json:"registration"`
+	Event        Event        `json:"event"`
+	ID           *int64       `json:"id"`
+	Email        *string      `json:"email"`
+	FirstName    *string      `json:"first_name"`
+	LastName     *string      `json:"last_name"`
+}
+
+func (q *Queries) GetRegistrations(ctx context.Context, arg GetRegistrationsParams) ([]GetRegistrationsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getRegistrations, arg.EventID, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Registration
+	var items []GetRegistrationsRow
 	for rows.Next() {
-		var i Registration
+		var i GetRegistrationsRow
 		if err := rows.Scan(
+			&i.Registration.ID,
+			&i.Registration.EventID,
+			&i.Registration.UserID,
+			&i.Registration.Active,
+			&i.Event.ID,
+			&i.Event.Name,
+			&i.Event.Description,
+			&i.Event.Location,
+			&i.Event.DateTime,
+			&i.Event.UserID,
 			&i.ID,
-			&i.EventID,
-			&i.UserID,
-			&i.Active,
+			&i.Email,
+			&i.FirstName,
+			&i.LastName,
 		); err != nil {
 			return nil, err
 		}
@@ -172,8 +191,8 @@ WHERE email = ?
 `
 
 type GetUserByEmailRow struct {
-	ID       int64
-	Password string
+	ID       int64  `json:"id"`
+	Password string `json:"password"`
 }
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
@@ -186,24 +205,24 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 const insertEvent = `-- name: InsertEvent :one
 ;
 
-INSERT INTO events (name, description, dateTime, location, user_id)
+INSERT INTO events (name, description, date_time, location, user_id)
 VALUES (?, ?, ?, ?, ?)
-RETURNING id, name, description, location, dateTime, user_id
+RETURNING id, name, description, location, date_time, user_id
 `
 
 type InsertEventParams struct {
-	Name        string
-	Description string
-	Datetime    time.Time
-	Location    string
-	UserID      int64
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	DateTime    time.Time `json:"date_time"`
+	Location    string    `json:"location"`
+	UserID      int64     `json:"user_id"`
 }
 
 func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (Event, error) {
 	row := q.db.QueryRowContext(ctx, insertEvent,
 		arg.Name,
 		arg.Description,
-		arg.Datetime,
+		arg.DateTime,
 		arg.Location,
 		arg.UserID,
 	)
@@ -213,7 +232,7 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (Event
 		&i.Name,
 		&i.Description,
 		&i.Location,
-		&i.Datetime,
+		&i.DateTime,
 		&i.UserID,
 	)
 	return i, err
@@ -228,14 +247,13 @@ RETURNING id, email, password, first_name, last_name
 `
 
 type InsertUserParams struct {
-	Email     string
-	Password  string
-	FirstName sql.NullString
-	LastName  sql.NullString
+	Email     string  `json:"email"`
+	Password  string  `json:"password"`
+	FirstName *string `json:"first_name"`
+	LastName  *string `json:"last_name"`
 }
 
 func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (User, error) {
-	fmt.Println("InsertUserParams", arg)
 	row := q.db.QueryRowContext(ctx, insertUser,
 		arg.Email,
 		arg.Password,
@@ -262,8 +280,8 @@ RETURNING id, event_id, user_id, active
 `
 
 type RegisterUserForEventParams struct {
-	EventID int64
-	UserID  int64
+	EventID int64 `json:"event_id"`
+	UserID  int64 `json:"user_id"`
 }
 
 func (q *Queries) RegisterUserForEvent(ctx context.Context, arg RegisterUserForEventParams) (Registration, error) {
@@ -282,17 +300,17 @@ const updateEvent = `-- name: UpdateEvent :exec
 ;
 
 UPDATE events
-SET name = ?, description = ?, location = ?, dateTime = ?, user_id = ?
+SET name = ?, description = ?, location = ?, date_time = ?, user_id = ?
 WHERE id = ?
 `
 
 type UpdateEventParams struct {
-	Name        string
-	Description string
-	Location    string
-	Datetime    time.Time
-	UserID      int64
-	ID          int64
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Location    string    `json:"location"`
+	DateTime    time.Time `json:"date_time"`
+	UserID      int64     `json:"user_id"`
+	ID          int64     `json:"id"`
 }
 
 func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) error {
@@ -300,7 +318,7 @@ func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) error 
 		arg.Name,
 		arg.Description,
 		arg.Location,
-		arg.Datetime,
+		arg.DateTime,
 		arg.UserID,
 		arg.ID,
 	)

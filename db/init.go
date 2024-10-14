@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -17,7 +18,9 @@ var CTX = context.Background()
 
 func InitDB() error {
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	databaseName := os.Getenv("DATABASE_NAME")
+
+	db, err := sql.Open("sqlite3", databaseName)
 	if err != nil {
 		return err
 	}
@@ -27,6 +30,7 @@ func InitDB() error {
 		return err
 	}
 
+	DB = db
 	DBQueries = New(db)
 
 	return nil

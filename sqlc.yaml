@@ -1,9 +1,12 @@
 version: "2"
 sql:
   - engine: "sqlite"
+    name: sqlite
     queries: "db/query.sql"
     schema: "db/schema.sql"
     gen:
       go:
         package: "db"
         out: "db"
+        emit_json_tags: true
+        emit_pointers_for_null_types: true
