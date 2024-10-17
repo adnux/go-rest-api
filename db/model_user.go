@@ -6,19 +6,11 @@ import (
 	"github.com/adnux/go-rest-api/utils"
 )
 
-// type User struct {
-// 	ID        int64  `json:"id"`
-// 	Email     string `json:"email" binding:"required"`
-// 	Password  string `json:"password" binding:"required"`
-// 	FirstName string `json:"firstname"`
-// 	LastName  string `json:"lastname"`
-// }
-
 func (user User) Save() (User, error) {
 	hashedPassword, err := utils.HashPassword(user.Password)
 
 	if err != nil {
-		return User{}, err
+		return User{}, errors.New("could not hash password")
 	}
 
 	insertedUser, err := DBQueries.InsertUser(CTX, InsertUserParams{
@@ -39,7 +31,7 @@ func (user User) Save() (User, error) {
 func (user User) DeleteUser() error {
 	err := DBQueries.DeleteUser(CTX, user.ID)
 	if err != nil {
-		return err
+		return errors.New("user not found")
 	}
 	return nil
 }
