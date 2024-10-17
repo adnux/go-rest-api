@@ -1,11 +1,10 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
-	"github.com/adnux/go-rest-api/models"
+	"github.com/adnux/go-rest-api/db"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,7 +19,7 @@ func registerForEvent(context *gin.Context) {
 		return
 	}
 
-	event, err := models.GetEventByID(eventId)
+	event, err := db.GetEventByID(eventId)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -57,7 +56,7 @@ func cancelRegistration(context *gin.Context) {
 		return
 	}
 
-	var event models.Event
+	var event db.Event
 	event.ID = eventId
 
 	err = event.CancelRegistration(authUserId)
@@ -79,8 +78,6 @@ func getAllRegistrationsFromEvent(context *gin.Context) {
 	authUserId := context.GetInt64("authUserId")
 	eventId, err := strconv.ParseInt(context.Param("id"), 10, 64)
 
-	fmt.Println("getAllRegistrationsFromEvent", authUserId, eventId)
-
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{
 			"error":   err.Error(),
@@ -89,7 +86,7 @@ func getAllRegistrationsFromEvent(context *gin.Context) {
 		return
 	}
 
-	registrations, err := models.GetRegistrationsForEvent(eventId, authUserId)
+	registrations, err := db.GetRegistrationsForEvent(eventId, authUserId)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{

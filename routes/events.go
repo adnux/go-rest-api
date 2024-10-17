@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/adnux/go-rest-api/models"
+	"github.com/adnux/go-rest-api/db"
 	"github.com/gin-gonic/gin"
 )
 
 func getEvents(context *gin.Context) {
-	events, err := models.GetAllEvents()
+	events, err := db.GetAllEvents()
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
 			"error":   err.Error(),
@@ -30,7 +30,7 @@ func getEvent(context *gin.Context) {
 		return
 	}
 
-	event, err := models.GetEventByID(eventId)
+	event, err := db.GetEventByID(eventId)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -44,7 +44,7 @@ func getEvent(context *gin.Context) {
 }
 
 func createEvent(context *gin.Context) {
-	var event models.Event
+	var event db.Event
 	err := context.ShouldBindJSON(&event)
 
 	if err != nil {
@@ -83,7 +83,7 @@ func updateEvent(context *gin.Context) {
 	}
 
 	authUserId := context.GetInt64("authUserId")
-	event, err := models.GetEventByID(eventId)
+	event, err := db.GetEventByID(eventId)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -93,14 +93,14 @@ func updateEvent(context *gin.Context) {
 		return
 	}
 
-	if event.UserId != authUserId {
+	if event.UserID != authUserId {
 		context.JSON(http.StatusUnauthorized, gin.H{
 			"message": "Not authorized to update event.",
 		})
 		return
 	}
 
-	var updatedEvent models.Event
+	var updatedEvent db.Event
 	err = context.ShouldBindJSON(&updatedEvent)
 
 	if err != nil {
@@ -137,7 +137,7 @@ func deleteEvent(context *gin.Context) {
 	}
 
 	authUserId := context.GetInt64("authUserId")
-	event, err := models.GetEventByID(eventId)
+	event, err := db.GetEventByID(eventId)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -147,7 +147,7 @@ func deleteEvent(context *gin.Context) {
 		return
 	}
 
-	if event.UserId != authUserId {
+	if event.UserID != authUserId {
 		context.JSON(http.StatusUnauthorized, gin.H{
 			"message": "Not authorized to delete event.",
 		})
