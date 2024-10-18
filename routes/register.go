@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -78,8 +77,6 @@ func cancelRegistration(context *gin.Context) {
 func getAllRegistrationsFromEvent(context *gin.Context) {
 	authUserId := context.GetInt64("authUserId")
 	eventId, err := strconv.ParseInt(context.Param("id"), 10, 64)
-
-	fmt.Println("getAllRegistrationsFromEvent", authUserId, eventId)
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{

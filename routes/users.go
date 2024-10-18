@@ -34,7 +34,7 @@ func signUp(context *gin.Context) {
 
 	context.JSON(http.StatusCreated, gin.H{
 		"message": "User created successfully",
-		"user":    user,
+		"user":    user.Email,
 	})
 }
 
@@ -73,6 +73,7 @@ func login(context *gin.Context) {
 
 	context.JSON(http.StatusOK, gin.H{
 		"message": "Login successful!",
+		"user":    user.Email,
 		"token":   token,
 	})
 }
@@ -99,5 +100,20 @@ func deleteUser(context *gin.Context) {
 
 	context.JSON(http.StatusOK, gin.H{
 		"message": "User deleted!",
+	})
+}
+
+func getAllUsers(context *gin.Context) {
+	users, err := models.GetAllUsers()
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"error":   err.Error(),
+			"message": "Could not retrieve users.",
+		})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{
+		"users": users,
 	})
 }

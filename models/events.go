@@ -5,162 +5,154 @@ import (
 	"time"
 
 	"github.com/adnux/go-rest-api/db"
+	"gorm.io/gorm"
 )
 
 type Event struct {
-	ID          int64     `json:"id"`
+	ID          int64     `json:"id" gorm:"primarykey"`
 	Name        string    `json:"name" binding:"required"`
 	Description string    `json:"description" binding:"required"`
 	Location    string    `json:"location" binding:"required"`
 	DateTime    time.Time `json:"datetime" binding:"required"`
-	UserId      int64     `json:"user_id"  binding:"required"`
+	UserID      int64     `json:"user_id" binding:"required"`
+	User        User      `json:"user" gorm:"foreignKey:UserID;references:ID"`
+}
+
+func (Event) TableName() string {
+	return "events"
 }
 
 func (event Event) SaveEvent() (Event, error) {
-	query := `
-	INSERT INTO events(name, description, location, dateTime, user_id) 
-	VALUES (?, ?, ?, ?, ?)`
 
-	stmt, err := db.DB.Prepare(query)
-	if err != nil {
-		return Event{}, err
-	}
-	defer stmt.Close()
+	result := db.DB.
+		Model(&Event{}).
+		Create(&event)
 
-	result, err := stmt.Exec(
-		event.Name,
-		event.Description,
-		event.Location,
-		event.DateTime,
-		event.UserId,
-	)
-	if err != nil {
-		return Event{}, err
+	if result.Error != nil {
+		return Event{}, result.Error
 	}
 
-	event.ID, err = result.LastInsertId()
-
-	return event, err
+	return event, nil
 }
 
 func GetAllEvents() ([]Event, error) {
-	query := "SELECT * FROM events"
-	rows, err := db.DB.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	var events []Event
-	for rows.Next() {
-		var event Event
-		if err := rows.Scan(
-			&event.ID,
-			&event.Name,
-			&event.Description,
-			&event.Location,
-			&event.DateTime,
-			&event.UserId,
-		); err != nil {
-			return nil, err
-		}
-		events = append(events, event)
+	result := db.DB.
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, email, first_name, last_name")
+		}).
+		Find(&events)
+
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
 	return events, nil
 }
 
 func GetEventByID(id int64) (*Event, error) {
-	query := "SELECT * FROM events WHERE id = ?"
-	row := db.DB.QueryRow(query, id)
-
 	var event Event
-	err := row.Scan(
-		&event.ID,
-		&event.Name,
-		&event.Description,
-		&event.Location,
-		&event.DateTime,
-		&event.UserId,
-	)
-	if err != nil {
-		return nil, err
+	result := db.DB.
+		Model(&Event{}).
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, email, first_name, last_name")
+		}).
+		Where("id = ?", id).
+		First(&event)
+
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
 	return &event, nil
 }
 
-func (event Event) UpdateEvent() error {
-	query := `
-	UPDATE events 
-	SET name = ?, description = ?, location = ?, dateTime = ?, user_id = ?
-	WHERE id = ?`
+func (event *Event) UpdateEvent() error {
+	result := db.DB.
+		Model(&Event{ID: event.ID}).
+		Where("id = ?", event.ID).
+		Updates(&event)
 
-	stmt, err := db.DB.Prepare(query)
-	if err != nil {
-		return err
+	if result.Error != nil {
+		return result.Error
 	}
-	defer stmt.Close()
 
-	_, err = stmt.Exec(
-		event.Name,
-		event.Description,
-		event.Location,
-		event.DateTime,
-		event.UserId,
-		event.ID,
-	)
+	if result.RowsAffected == 0 {
+		return errors.New("no event found")
+	}
 
-	return err
+	return nil
 }
 
 func (event Event) DeleteEvent() error {
-	query := `
-	DELETE FROM events WHERE id = ?
-	`
-	stmt, err := db.DB.Prepare(query)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
+	result := db.DB.
+		Model(&Event{ID: event.ID}).
+		Delete(&event)
 
-	_, err = stmt.Exec(event.ID)
-	return err
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("no event found")
+	}
+
+	return nil
 }
 
 func (event Event) Register(userId int64) error {
-	query := `
-	INSERT INTO registrations(event_id, user_id) VALUES (?, ?)
-	`
-	stmt, err := db.DB.Prepare(query)
-
+	user, err := GetUserByID(userId)
 	if err != nil {
 		return err
 	}
 
-	defer stmt.Close()
+	result := db.DB.
+		Model(&Registration{}).
+		Create(&Registration{EventId: event.ID, User: *user})
 
-	_, err = stmt.Exec(event.ID, userId)
+	if result.Error != nil {
+		return result.Error
+	}
 
-	return err
+	return nil
 }
 
 func (event Event) CancelRegistration(userId int64) error {
-	query := `
-	UPDATE registrations
-	SET active = 0
-	WHERE event_id = ? AND user_id = ? AND active = true
-	`
+	result := db.DB.
+		Model(&Registration{}).
+		Where("event_id = ? AND user_id = ?", event.ID, userId).
+		Update("active", false)
 
-	result, err := db.DB.Exec(query, event.ID, userId)
-	if err != nil {
-		return err
+	if result.Error != nil {
+		return result.Error
 	}
 
-	total, err := result.RowsAffected()
-	if total == 0 {
+	if result.RowsAffected == 0 {
 		return errors.New("no active registration found")
 	}
 
-	return err
+	return nil
+}
+
+func (event *Event) SetUser(authUserId int64) (*Event, error) {
+	user, err := GetUserByID(authUserId)
+	if err != nil {
+		return &Event{}, err
+	}
+
+	event.UserID = user.ID
+	event.User = *user
+
+	return event, nil
+}
+
+func (event Event) ToJSON() string {
+	return `{
+		"id": ` + string(event.ID) + `,
+		"name": "` + event.Name + `",
+		"description": "` + event.Description + `",
+		"location": "` + event.Location + `",
+		"datetime": "` + event.DateTime.String() + `"
+		"user_id": ` + string(event.UserID) + `
+	}`
 }
