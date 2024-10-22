@@ -1,26 +1,31 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/adnux/go-rest-api/middlewares"
-	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(server *gin.Engine) {
-	server.GET("/events", getEvents)
-	server.GET("/events/:id", getEvent)
-
-	authenticated := server.Group("/")
-	authenticated.Use(middlewares.Authenticate)
+func AuthenticatedRoutes(server *http.ServeMux) {
 	// Events
-	authenticated.POST("/events", createEvent)
-	authenticated.PUT("/events/:id", updateEvent)
-	authenticated.DELETE("/events/:id", deleteEvent)
+	server.Handle("POST /events", middlewares.EnsureAuthHandler(createEvent))
+	server.Handle("PUT /events/{id}", middlewares.EnsureAuthHandler(updateEvent))
+	server.Handle("DELETE /events/{id}", middlewares.EnsureAuthHandler(deleteEvent))
 	// Registrations
-	authenticated.GET("/events/:id/registrations", getAllRegistrationsFromEvent)
-	authenticated.POST("/events/:id/register", registerForEvent)
-	authenticated.PUT("/events/:id/unregister", cancelRegistration)
+	server.Handle("GET /events/{id}/registrations", middlewares.EnsureAuthHandler(getAllRegistrationsFromEvent))
+	server.Handle("POST /events/{id}/register", middlewares.EnsureAuthHandler(registerForEvent))
+	server.Handle("PUT /events/{id}/unregister", middlewares.EnsureAuthHandler(cancelRegistration))
+}
+
+func RegisterRoutes(server *http.ServeMux) {
+	http.Handle("/", server)
+	// Events
+	server.HandleFunc("GET /events", getEvents)
+	server.HandleFunc("GET /events/{id}", getEvent)
 	// Users
-	server.POST("/signup", signUp)
-	server.POST("/login", login)
-	server.DELETE("user/:id", deleteUser)
+	server.HandleFunc("POST /signup", signUp)
+	server.HandleFunc("POST /login", login)
+	server.HandleFunc("DELETE user/{id}", deleteUser)
+	// Authenticated routes
+	AuthenticatedRoutes(server)
 }
