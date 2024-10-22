@@ -2,9 +2,19 @@ POST http://localhost:8080/signup
 content-type: application/json
 
 {
-  "email": "adnux182@gmail.com",
-  "password": "123"
+"email": "andreferreira.dev@gmail.com",
+"password": "456",
+"first_name": "Andre",
+"last_name": "Ferreira"
 }
 
-# "email": "camivalle@gmail.com",
-# "password": "321"
+
+# "email": "adnux182@gmail.com",
+# "password": "123",
+# "first_name": "Andre",
+# "last_name": "Ferreira"
+
+# "email": "andreferreira.dev@gmail.com",
+# "password": "456",
+# "first_name": "Andre",
+# "last_name": "Ferreira"

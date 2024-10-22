@@ -4,25 +4,25 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/adnux/go-rest-api/models"
+	"github.com/adnux/go-rest-api/db"
 	"github.com/adnux/go-rest-api/utils"
 	"github.com/gin-gonic/gin"
 )
 
 func signUp(context *gin.Context) {
-	var user models.User
 
+	var user db.User
 	err := context.ShouldBindJSON(&user)
 
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{
+		context.JSON(http.StatusUnprocessableEntity, gin.H{
 			"message": "Could not parse request data.",
 			"error":   err.Error(),
 		})
 		return
 	}
 
-	err = user.Save()
+	user, err = user.Save()
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -39,7 +39,7 @@ func signUp(context *gin.Context) {
 }
 
 func login(context *gin.Context) {
-	var user models.User
+	var user db.User
 
 	err := context.ShouldBindJSON(&user)
 
@@ -50,7 +50,6 @@ func login(context *gin.Context) {
 		})
 		return
 	}
-
 	err = user.ValidateCredentials()
 
 	if err != nil {
@@ -87,7 +86,7 @@ func deleteUser(context *gin.Context) {
 		return
 	}
 
-	userToDelete := models.User{ID: userId}
+	userToDelete := db.User{ID: userId}
 	err = userToDelete.DeleteUser()
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
