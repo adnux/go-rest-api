@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -9,95 +10,95 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func signUp(context *gin.Context) {
+func signUp(w http.ResponseWriter, r *http.Request) {
 	var user models.User
-
-	err := context.ShouldBindJSON(&user)
+	err := json.NewDecoder(r.Body).Decode(&user)
 
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{
-			"message": "Could not parse request data.",
-			"error":   err.Error(),
-		})
+		http.Error(w, "Could not parse request data.", http.StatusBadRequest)
 		return
 	}
 
 	err = user.Save()
 
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Could not save user.",
-			"error":   err.Error(),
-		})
+		http.Error(w, "Could not save user.", http.StatusInternalServerError)
 		return
 	}
 
-	context.JSON(http.StatusCreated, gin.H{
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	jsonData, err := json.Marshal(gin.H{
 		"message": "User created successfully",
 		"user":    user,
 	})
+	if err != nil {
+		http.Error(w, "Could not marshal response data.", http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonData)
 }
 
-func login(context *gin.Context) {
+func login(w http.ResponseWriter, r *http.Request) {
 	var user models.User
-
-	err := context.ShouldBindJSON(&user)
+	err := json.NewDecoder(r.Body).Decode(&user)
 
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{
-			"error":   err.Error(),
-			"message": "Could not parse request data.",
-		})
+		http.Error(w, "Could not parse request data.", http.StatusBadRequest)
 		return
 	}
 
 	err = user.ValidateCredentials()
 
 	if err != nil {
-		context.JSON(http.StatusUnauthorized, gin.H{
-			"error":   err.Error(),
-			"message": "Could not authenticate user.",
-		})
+		http.Error(w, "Could not authenticate user.", http.StatusUnauthorized)
 		return
 	}
 
 	token, err := utils.GenerateToken(user.Email, user.ID)
 
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{
-			"error":   err.Error(),
-			"message": "Could not authenticate user.",
-		})
+		http.Error(w, "Could not authenticate user.", http.StatusInternalServerError)
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(gin.H{
 		"message": "Login successful!",
 		"token":   token,
 	})
+	if err != nil {
+		http.Error(w, "Could not marshal response data.", http.StatusInternalServerError)
+		return
+	}
 }
 
-func deleteUser(context *gin.Context) {
-	userId, err := strconv.ParseInt(context.Param("id"), 10, 64)
+func deleteUser(w http.ResponseWriter, r *http.Request) {
+	userId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{
-			"error":   err.Error(),
-			"message": "Could not parse user id.",
-		})
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
 	userToDelete := models.User{ID: userId}
 	err = userToDelete.DeleteUser()
+
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{
-			"error":   err.Error(),
-			"message": "Could not delete user.",
-		})
+		http.Error(w, "Could not delete user.", http.StatusInternalServerError)
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(gin.H{
 		"message": "User deleted!",
 	})
+
+	if err != nil {
+		http.Error(w, "Could not marshal response data.", http.StatusInternalServerError)
+		return
+	}
+
 }

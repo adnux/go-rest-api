@@ -1,31 +1,43 @@
 package middlewares
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/adnux/go-rest-api/utils"
-	"github.com/gin-gonic/gin"
 )
 
-func Authenticate(context *gin.Context) {
-	token := context.Request.Header.Get("Authorization")
+type AuthenticatedHandler func(http.ResponseWriter, *http.Request)
+type contextKey string
+type EnsureAuth struct {
+	handler AuthenticatedHandler
+}
+
+const authUserIDKey contextKey = "authUserId"
+
+func (ensureAuth *EnsureAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Println("Ensuring authentication...")
+	token := r.Header.Get("Authorization")
 
 	if token == "" {
-		context.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"message": "Not authorized.",
-		})
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"message": "Not authorized."}`))
 		return
 	}
 
 	authUserId, err := utils.VerifyToken(token)
 
 	if err != nil {
-		context.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"message": "Not authorized.",
-		})
-		return
+		http.Error(w, "Not authorized.", http.StatusUnauthorized)
 	}
 
-	context.Set("authUserId", authUserId)
-	context.Next()
+	r.Header.Set("authUserId", fmt.Sprintf("%d", authUserId))
+	ctx := context.WithValue(r.Context(), authUserIDKey, authUserId)
+	ensureAuth.handler(w, r.WithContext(ctx))
+}
+
+func EnsureAuthHandler(handlerToWrap AuthenticatedHandler) *EnsureAuth {
+	return &EnsureAuth{handlerToWrap}
 }
